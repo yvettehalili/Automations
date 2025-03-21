@@ -1,4 +1,4 @@
-import json
+import configparser
 import logging
 import mysql.connector
 import psycopg2
@@ -10,18 +10,24 @@ log_filename = "/backup/logs/ITSBacchaw_creation_2025-03-21.log"
 logging.basicConfig(filename=log_filename, level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 # Load database credentials
-with open('/root/jsonfiles/ti-dba-prod-01.json') as f:
-    db_credentials = json.load(f)
+config = configparser.ConfigParser()
+config.read('/backup/configs/db_credentials.conf')
 
-mysql_user = db_credentials['mysql']['user']
-mysql_password = db_credentials['mysql']['password']
-pgsql_user = db_credentials['pgsql']['user']
-pgsql_password = db_credentials['pgsql']['password']
+try:
+    db_user = config['credentials']['DB_USR']
+    db_password = config['credentials']['DB_PWD']
+except KeyError as e:
+    logging.error(f"Missing key in configuration file: {e}")
+    exit(1)
 
 # Load server lists
 def load_server_list(file_path):
-    with open(file_path, 'r') as f:
-        return [line.strip() for line in f.readlines()]
+    try:
+        with open(file_path, 'r') as f:
+            return [line.strip() for line in f.readlines()]
+    except FileNotFoundError:
+        logging.error(f"Server list file not found: {file_path}")
+        exit(1)
 
 mysql_servers = load_server_list('/backup/configs/MYSQL_servers_list.conf')
 pgsql_servers = load_server_list('/backup/configs/PGSQL_servers_list.conf')
@@ -35,8 +41,8 @@ def create_mysql_user(server):
     try:
         conn = mysql.connector.connect(
             host=server,
-            user=mysql_user,
-            password=mysql_password
+            user=db_user,
+            password=db_password
         )
         cursor = conn.cursor()
         cursor.execute(f"CREATE USER '{new_user}'@'%' IDENTIFIED BY '{new_password}';")
@@ -60,8 +66,8 @@ def create_pgsql_user(server):
     try:
         conn = psycopg2.connect(
             host=server,
-            user=pgsql_user,
-            password=pgsql_password
+            user=db_user,
+            password=db_password
         )
         cursor = conn.cursor()
         cursor.execute(sql.SQL("CREATE USER {} WITH PASSWORD %s;").format(sql.Identifier(new_user)), [new_password])
