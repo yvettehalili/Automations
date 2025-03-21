@@ -38,6 +38,7 @@ new_password = "ITSBacchaw"
 
 # Create user in MySQL
 def create_mysql_user(server):
+    conn = None
     try:
         conn = mysql.connector.connect(
             host=server,
@@ -57,12 +58,13 @@ def create_mysql_user(server):
         else:
             logging.error(err)
     finally:
-        if conn.is_connected():
+        if conn and conn.is_connected():
             cursor.close()
             conn.close()
 
 # Create user in PostgreSQL
 def create_pgsql_user(server):
+    conn = None
     try:
         conn = psycopg2.connect(
             host=server,
@@ -77,8 +79,9 @@ def create_pgsql_user(server):
     except Exception as e:
         logging.error(f"Error creating PostgreSQL user on server {server}: {e}")
     finally:
-        cursor.close()
-        conn.close()
+        if conn:
+            cursor.close()
+            conn.close()
 
 # Process all servers
 for server in mysql_servers:
